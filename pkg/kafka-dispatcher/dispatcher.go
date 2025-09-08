@@ -2,10 +2,12 @@ package kafkadispatcher
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"log"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -26,6 +28,10 @@ func NewDispatcher(brokers []string, topic, groupID string, handlers ...Handler)
 			Brokers: brokers,
 			GroupID: groupID,
 			Topic:   topic,
+			Dialer: &kafka.Dialer{
+				Timeout: 10 * time.Second,
+				TLS:     &tls.Config{},
+			},
 		}),
 		workerPool: make(chan struct{}, runtime.NumCPU()),
 	}
