@@ -1,6 +1,10 @@
 package kafkadispatcher
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+)
 
 type Representation map[string]any
 
@@ -44,7 +48,7 @@ type Event struct {
 
 	ResourceType         ResourceType   `json:"resourceType"`
 	OperationType        OperationType  `json:"operationType"`
-	ResourcePath         string         `json:"resourcePath"`
+	ResourcePath         ResourcePath   `json:"resourcePath"`
 	Representation       Representation `json:"representation"`
 	Error                *string        `json:"error,omitempty"`
 	Details              map[string]any `json:"details"`
@@ -109,3 +113,28 @@ const (
 	OperationTypeDelete = "DELETE"
 	OperationTypeUpdate = "UPDATE"
 )
+
+type ResourcePath string
+
+func (rp ResourcePath) ExtractUserID() (string, error) {
+	// Extract the user ID from resourcePath ("users/<user-id>")
+	const prefix = "users/"
+	if !strings.HasPrefix(string(rp), prefix) {
+		return "", fmt.Errorf("invalid resourcePath: %s", rp)
+	}
+	userID := strings.TrimPrefix(string(rp), prefix)
+
+	return userID, nil
+}
+
+func (rp ResourcePath) ExtractOrganizationID() (string, error) {
+	// Extract the organization ID from resourcePath ("organizations/<organization-id>")
+	const prefix = "organizations/"
+	if !strings.HasPrefix(string(rp), prefix) {
+		return "", fmt.Errorf("invalid resourcePath: %s", rp)
+	}
+
+	orgID := strings.TrimPrefix(string(rp), prefix)
+
+	return orgID, nil
+}
