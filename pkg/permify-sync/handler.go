@@ -13,22 +13,20 @@ import (
 
 // Interface for Keycloak client to be able to use GetUserByEmail
 type KeycloakClient interface {
-	GetUserByEmail(email string) (*gocloak.User, error)
+	GetUserByEmail(context.Context, string) (*gocloak.User, error)
 }
 
 // PermifySync is a handler that syncs the organization memberships and roles to Permify based on Keycloak events
 type PermifySync struct {
 	permifyClient  *permissions.AuthzClient
 	keycloakClient KeycloakClient
-	dispatcher     *kafkadispatcher.Dispatcher
 	realm          string
 }
 
-func NewPermifySync(permifyClient *permissions.AuthzClient, keycloakClient KeycloakClient, dispatcher *kafkadispatcher.Dispatcher, realm string) kafkadispatcher.Handler {
+func NewPermifySync(permifyClient *permissions.AuthzClient, keycloakClient KeycloakClient, realm string) kafkadispatcher.Handler {
 	return &PermifySync{
 		permifyClient:  permifyClient,
 		keycloakClient: keycloakClient,
-		dispatcher:     dispatcher,
 		realm:          realm,
 	}
 }
@@ -58,7 +56,7 @@ func (h *PermifySync) Handle(ctx context.Context, event kafkadispatcher.Event) e
 
 }
 
-func (h *PermifySync) handleAddUser(_ context.Context, event kafkadispatcher.Event) error {
+func (h *PermifySync) handleAddUser(ctx context.Context, event kafkadispatcher.Event) error {
 	orgID, err := event.ResourcePath.ExtractOrganizationID()
 	if err != nil {
 		return err
@@ -74,7 +72,7 @@ func (h *PermifySync) handleAddUser(_ context.Context, event kafkadispatcher.Eve
 		return errors.New("email not a string")
 	}
 
-	user, err := h.keycloakClient.GetUserByEmail(email)
+	user, err := h.keycloakClient.GetUserByEmail(ctx, email)
 	if err != nil {
 		return err
 	}
