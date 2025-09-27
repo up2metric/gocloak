@@ -3,6 +3,7 @@ package permifysync
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	permissions "bitbucket.org/up2metricPC/u2m-permissions"
@@ -57,10 +58,13 @@ func (h *PermifySync) Handle(ctx context.Context, event kafkadispatcher.Event) e
 }
 
 func (h *PermifySync) handleAddUser(ctx context.Context, event kafkadispatcher.Event) error {
-	orgID, err := event.ResourcePath.ExtractOrganizationID()
-	if err != nil {
-		return err
+	fmt.Println("handleAddUser", event.ResourcePath)
+	tokens := strings.Split(string(event.ResourcePath), "/")
+	if len(tokens) != 3 || tokens[0] != "organizations" || tokens[2] != "members" {
+		return errors.New("invalid resource path")
 	}
+
+	orgID := tokens[1]
 
 	emailVal, ok := event.Details["email"]
 	if !ok {
@@ -115,7 +119,7 @@ func (h *PermifySync) handleCreateOrganization(_ context.Context, event kafkadis
 		return errors.New("attributes not a map[string]any type")
 	}
 
-	owners, ok := attributesMap["owners"]
+	owners, ok := attributesMap["owner"]
 	if !ok {
 		return errors.New("owners not found in attributes")
 	}
