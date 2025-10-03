@@ -46,9 +46,7 @@ func (h *PermifySync) Handle(ctx context.Context, event kafkadispatcher.Event) e
 		}
 
 	case kafkadispatcher.ResourceOrganization:
-		if event.OperationType.Equal(kafkadispatcher.OperationTypeCreate) {
-			return h.handleCreateOrganization(ctx, event)
-		} else if event.OperationType.Equal(kafkadispatcher.OperationTypeDelete) {
+		if event.OperationType.Equal(kafkadispatcher.OperationTypeDelete) {
 			return h.handleDeleteOrganization(ctx, event)
 		}
 	}
@@ -58,7 +56,6 @@ func (h *PermifySync) Handle(ctx context.Context, event kafkadispatcher.Event) e
 }
 
 func (h *PermifySync) handleAddUser(ctx context.Context, event kafkadispatcher.Event) error {
-	fmt.Println("handleAddUser", event.ResourcePath)
 	tokens := strings.Split(string(event.ResourcePath), "/")
 	if len(tokens) != 3 || tokens[0] != "organizations" || tokens[2] != "members" {
 		return errors.New("invalid resource path")
@@ -83,8 +80,20 @@ func (h *PermifySync) handleAddUser(ctx context.Context, event kafkadispatcher.E
 
 	userID := user.ID
 
+	// Add the user to the organization, thsi sets role to member
 	if err := organizationPermissions.AddUser(h.permifyClient, orgID, *userID); err != nil {
 		return err
+	}
+
+	// Check if the user is the owner of the organization
+	owner, err := event.Representation.GetAttribute("owner")
+	if err != nil {
+		fmt.Println("Error getting owner attribute", err)
+	}
+
+	// If the user is the owner of the organization, set the owner role
+	if err == nil && owner[0] == *userID {
+		return organizationPermissions.SetRole(h.permifyClient, orgID, organizationPermissions.ROLE_OWNER, *userID)
 	}
 
 	return nil
@@ -101,50 +110,6 @@ func (h *PermifySync) handleRemoveUser(_ context.Context, event kafkadispatcher.
 	userID := tokens[3]
 
 	if err := organizationPermissions.RemoveUser(h.permifyClient, orgID, userID); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (h *PermifySync) handleCreateOrganization(_ context.Context, event kafkadispatcher.Event) error {
-	// Extract the owner ID from representation's attributes
-	attributes, ok := event.Representation["attributes"]
-	if !ok {
-		return errors.New("attributes not found in event representation")
-	}
-
-	attributesMap, ok := attributes.(map[string]any)
-	if !ok {
-		return errors.New("attributes not a map[string]any type")
-	}
-
-	owners, ok := attributesMap["owner"]
-	if !ok {
-		return errors.New("owners not found in attributes")
-	}
-
-	ownersList, ok := owners.([]string)
-	if !ok {
-		return errors.New("owners not a []string type")
-	}
-
-	if len(ownersList) == 0 {
-		return errors.New("owners list is empty")
-	}
-
-	// There is only one owner in the list
-	ownerID := ownersList[0]
-
-	// Extract the organization ID from the resource path
-	orgID, err := event.ResourcePath.ExtractOrganizationID()
-	if err != nil {
-		return err
-	}
-
-	// Set the owner role for the organization
-	err = organizationPermissions.SetRole(h.permifyClient, orgID, organizationPermissions.ROLE_OWNER, ownerID)
-	if err != nil {
 		return err
 	}
 

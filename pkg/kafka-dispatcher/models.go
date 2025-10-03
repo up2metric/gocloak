@@ -28,6 +28,38 @@ func (r *Representation) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, (*map[string]any)(r))
 }
 
+func (r *Representation) GetAttribute(key string) ([]string, error) {
+	attributes, ok := (*r)["attributes"]
+	if !ok {
+		return nil, fmt.Errorf("attributes not found in representation")
+	}
+
+	attributesMap, ok := attributes.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("attributes not a map[string]any type")
+	}
+
+	attributeValue, ok := attributesMap[key]
+	if !ok {
+		return nil, fmt.Errorf("attribute %s not found in representation", key)
+	}
+
+	attributeSlice, ok := attributeValue.([]any)
+	if !ok {
+		return nil, fmt.Errorf("attribute %s is not a slice", key)
+	}
+
+	result := make([]string, len(attributeSlice))
+	for i, item := range attributeSlice {
+		if str, ok := item.(string); ok {
+			result[i] = str
+		} else {
+			return nil, fmt.Errorf("attribute %s contains non-string value at index %d", key, i)
+		}
+	}
+	return result, nil
+}
+
 // AuthDetails is embedded in Event.
 type AuthDetails struct {
 	RealmID   string `json:"realmId"`
