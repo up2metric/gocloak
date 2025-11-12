@@ -2,12 +2,10 @@ package kafkadispatcher
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"log"
 	"sync"
-	"time"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -32,10 +30,6 @@ type Dispatcher struct {
 // NewDispatcher creates a new dispatcher with the given builder and handlers.
 func NewDispatcher(builder *KafkaConfigBuilder, handlers ...Handler) *Dispatcher {
 	once.Do(func() {
-		builder = builder.
-			ManualCommit().
-			DefaultDialer(10*time.Second, &tls.Config{})
-
 		instance = &Dispatcher{
 			handlers: handlers,
 			reader:   builder.BuildReader(),
