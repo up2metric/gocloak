@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/segmentio/kafka-go"
+	"github.com/segmentio/kafka-go/sasl"
+	"github.com/segmentio/kafka-go/sasl/plain"
 )
 
 // KafkaConfigBuilder provides a fluent interface for building Kafka ReaderConfig.
@@ -37,6 +39,67 @@ func NewKafkaConfigBuilder() *KafkaConfigBuilder {
 	}
 }
 
+// --- Authentication & Connection Methods ---
+
+// ensureDialer makes sure a Dialer exists before we try to modify it.
+func (b *KafkaConfigBuilder) ensureDialer() {
+	if b.config.Dialer == nil {
+		b.config.Dialer = &kafka.Dialer{
+			Timeout:   10 * time.Second,
+			DualStack: true,
+		}
+	}
+}
+
+// WithSASLPlain adds optional PLAIN authentication.
+// If username or password are empty, it does nothing (optional).
+func (b *KafkaConfigBuilder) WithSASLPlain(username, password string) *KafkaConfigBuilder {
+	if username == "" && password == "" {
+		return b
+	}
+
+	b.ensureDialer()
+	b.config.Dialer.SASLMechanism = plain.Mechanism{
+		Username: username,
+		Password: password,
+	}
+	return b
+}
+
+// WithSASLMechanism sets a custom SASL mechanism (e.g., SCRAM, OAUTHBEARER).
+func (b *KafkaConfigBuilder) WithSASLMechanism(mechanism sasl.Mechanism) *KafkaConfigBuilder {
+	if mechanism == nil {
+		return b
+	}
+	b.ensureDialer()
+	b.config.Dialer.SASLMechanism = mechanism
+	return b
+}
+
+// WithTLS sets the TLS configuration for secure connections.
+// Pass nil to disable TLS (use PLAINTEXT).
+func (b *KafkaConfigBuilder) WithTLS(tlsConfig *tls.Config) *KafkaConfigBuilder {
+	b.ensureDialer()
+	b.config.Dialer.TLS = tlsConfig
+	return b
+}
+
+// Dialer sets a completely custom dialer (overwrites existing SASL/TLS settings).
+func (b *KafkaConfigBuilder) Dialer(dialer *kafka.Dialer) *KafkaConfigBuilder {
+	b.config.Dialer = dialer
+	return b
+}
+
+// DefaultDialer sets a default dialer with timeout and TLS.
+// Warning: This resets any previously configured SASL mechanisms.
+func (b *KafkaConfigBuilder) DefaultDialer(timeout time.Duration, tlsConfig *tls.Config) *KafkaConfigBuilder {
+	b.config.Dialer = &kafka.Dialer{
+		Timeout: timeout,
+		TLS:     tlsConfig,
+	}
+	return b
+}
+
 // Brokers sets the list of broker addresses.
 func (b *KafkaConfigBuilder) Brokers(brokers []string) *KafkaConfigBuilder {
 	b.config.Brokers = brokers
@@ -64,21 +127,6 @@ func (b *KafkaConfigBuilder) Topic(topic string) *KafkaConfigBuilder {
 // Partition sets the partition to read messages from.
 func (b *KafkaConfigBuilder) Partition(partition int) *KafkaConfigBuilder {
 	b.config.Partition = partition
-	return b
-}
-
-// Dialer sets a custom dialer for connections.
-func (b *KafkaConfigBuilder) Dialer(dialer *kafka.Dialer) *KafkaConfigBuilder {
-	b.config.Dialer = dialer
-	return b
-}
-
-// DefaultDialer sets a default dialer with timeout and TLS.
-func (b *KafkaConfigBuilder) DefaultDialer(timeout time.Duration, tlsConfig *tls.Config) *KafkaConfigBuilder {
-	b.config.Dialer = &kafka.Dialer{
-		Timeout: timeout,
-		TLS:     tlsConfig,
-	}
 	return b
 }
 
